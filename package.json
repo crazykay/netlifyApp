@@ -1,0 +1,19 @@
+{
+  "name": "netlifyapp",
+  "version": "1.0.0",
+  "description": "simple netlify app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crazykay/netlifyApp.git"
+  },
+  "author": "ck",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/crazykay/netlifyApp/issues"
+  },
+  "homepage": "https://github.com/crazykay/netlifyApp#readme"
+}
