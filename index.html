@@ -1,11 +1,460 @@
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Test Index</title>
+
+<meta charset="utf-8">
+
+<!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/3.0.3/normalize.min.css"> -->
+<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.49.0/mapbox-gl.js'></script>
+<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.css' rel='stylesheet' />
+<meta name="viewport" content="width=device-width, user-scalable=0, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+<title>stories</title>
+<script src="./basicScroll.min.js"></script>
+<script src="./dist/test.js"></script>
+<style>
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    scroll-snap-type-y: mandatory;
+  }
+
+  /* Prevents img without src to appear */
+  img:not([src]) {
+    visibility: hidden;
+  }
+
+  :root {
+    --o: 0;
+  }
+
+  .map-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .marker {
+    background-image: url('./egg.png');
+    background-size: cover;
+    width: 24.3px;
+    height: 33.1px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .fade-box {
+    width: 100vw;
+    height: 60vh;
+  }
+
+  .container {
+    position: relative;
+    width: 100vw;
+    height: auto;
+    /* height: 100vh;
+    overflow-y: scroll; */
+  }
+
+  .container .padding {
+    width: 100%;
+    height: 60vh;
+    opacity: var(--o);
+  }
+
+  .egg:first-child .padding {
+    height: 0;
+  }
+
+  .egg {
+    display: flex;
+    flex-flow: column wrap;
+    padding: .5em;
+  }
+
+  .egg .egg-info {
+    display: flex;
+    flex-flow: column wrap;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 2em 1.5em;
+    background: rgba(255, 255, 255, .90);
+    border-radius: .1em;
+    margin: 1em 2em;
+  }
+
+  .egg .egg-info .title {
+    font-size: 1.7em;
+  }
+
+  .egg .egg-info .location {
+    font-size: 1em;
+    align-self: flex-end;
+  }
+
+  .egg .egg-info .section {
+    font-size: 1.1em;
+    margin: 1em 0;
+  }
+
+  .egg .bag-box {
+    border-radius: .1em;
+    margin-bottom: 1em;
+  }
+
+  .egg .bag-box .bag {
+    display: flex;
+    flex-flow: column wrap;
+
+    /* padding: 2em; */
+  }
+
+  .egg .bag-box .bag .bag-info {
+    background: rgba(255, 255, 255, .90);
+    padding: 1em 1em;
+    margin: 0 2em;
+    display: flex;
+    align-items: center;
+  }
+
+  .egg .bag-box .bag .bag-info .clock {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    background-image: url('./clock.svg');
+    background-size: cover;
+    margin-right: .5em;
+  }
+
+  .egg .bag-box .bag .bag-media {
+    padding: 1em 2em;
+  }
+
+  .egg .bag-box .bag .bag-media img {
+    border-radius: .1em;
+  }
+</style>
 </head>
+
 <body>
-  <h1>HELLO THERE</h1>
+  <div id="map" class="map-container"></div>
+  <div class="container" id="container">
+  </div>
 </body>
+<script>
+  let timeeggs = []
+  let marker = null
+  let authorization = null
+  let auth_key = null
+  const flyToZoomValue = 9
+  mapboxgl.accessToken = 'pk.eyJ1IjoiY3JhenlrYXkiLCJhIjoiY2picnlwdDlhMG5ibTMzcjB1a2NkOGpsayJ9.kpSWi-Fytupo4yOtE5Vwrg';
+  const map = new mapboxgl.Map({
+    container: 'map',
+    interactive: false,
+    style: 'mapbox://styles/mapbox/streets-v9'
+  })
+
+  map.on('moveend', e => {})
+</script>
+
+<script>
+  /**
+   * @desc 获取访问路径中某个参数
+   * @param paramName 参数名
+   * @param url 指定要截取参数的url（可以为空，如果为空url指向当前页面）
+   */
+  function getParamter(paramName, url) {
+    var seachUrl = window.location.search.replace("?", "");
+    if (url != null) {
+      var index = url.indexOf('?');
+      url = url.substr(index + 1);
+      seachUrl = url;
+    }
+    var ss = seachUrl.split("&");
+    var paramNameStr = "";
+    var paramNameIndex = -1;
+    for (var i = 0; i < ss.length; i++) {
+      paramNameIndex = ss[i].indexOf("=");
+      paramNameStr = ss[i].substring(0, paramNameIndex);
+      if (paramNameStr == paramName) {
+        var returnValue = ss[i].substring(paramNameIndex + 1, ss[i].length);
+        if (typeof (returnValue) == "undefined") {
+          returnValue = "";
+        }
+        return returnValue;
+      }
+    }
+    return "";
+  }
+  const isElementOnScreen = (tg_id) => {
+    let element = document.querySelector(`.egg${tg_id}`)
+    let bounds = element.getBoundingClientRect()
+    return bounds.top < window.innerHeight && bounds.bottom > 0
+  }
+
+  let activeTimeegg = 0
+  const setActiveTimeegg = (tg_id) => {
+    timeeggs.map(egg => {
+      if (egg.tg_id === tg_id) {
+        if (marker !== null) marker.remove()
+        const lnglat = new mapboxgl.LngLat(Number(egg.longitude), Number(egg.latitude))
+
+        let el = document.createElement('div');
+        el.className = 'marker';
+        marker = new mapboxgl.Marker()
+          .setLngLat(lnglat)
+          .addTo(map)
+        map.flyTo({
+          center: lnglat,
+          zoom: flyToZoomValue,
+          speed: 1.5,
+          curve: .7,
+          easing(t) {
+            return t
+          }
+        })
+      }
+    })
+    activeTimeegg = tg_id
+  }
+  let ticking = false
+  const scrollStart = () => {
+    window.addEventListener('scroll', function (e) {
+      if (!ticking) {
+        window.requestAnimationFrame(function () {
+          for (let i = 0; i < timeeggs.length; i++) {
+            const egg = timeeggs[i];
+            if (isElementOnScreen(egg.tg_id)) {
+              if (egg.tg_id !== activeTimeegg) {
+                setActiveTimeegg(egg.tg_id)
+                // scrollTimeeggBoxStart(egg.tg_id)
+              }
+              // console.log(egg.tg_id + ' is on screen')
+              break
+            }
+          }
+          ticking = false
+        })
+      }
+      ticking = true
+    })
+  }
+  const scrollStop = () => {
+    window.addEventListener('scroll', e => {
+      window.scrollTo(0, 0)
+    })
+  }
+
+  let instance = {}
+  const scrollTimeeggBoxInit = (tg_id) => {
+    instance[tg_id] = basicScroll.create({
+      elem: document.querySelector(`.egg${tg_id}`),
+      from: 'bottom-bottom',
+      to: 'top-middle',
+      inside: (instance, percentage) => {
+        let zoomPlus = (100 - percentage) / 20
+        map.zoomTo(flyToZoomValue + zoomPlus)
+      },
+      outside: (instance, percentage) => {
+        return
+      }
+    })
+  }
+  const scrollTimeeggBoxStart = (tg_id) => {
+    console.log('start', tg_id)
+    Object.keys(instance).map(key => {
+      if (Number(key) === tg_id) {
+        instance[key].start()
+      } else {
+        instance[key].stop()
+      }
+    })
+  }
+</script>
+
+<script>
+  const container = document.querySelector('#container')
+  const app = new App()
+  const searchParams = (params) => {
+    let result = Object.keys(params).map((key) => {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+    }).join('&')
+    return result;
+  }
+
+  // 登录
+  const checkinSync = async () => {
+    const auth = await localStorage.getItem('auth')
+    const key = await localStorage.getItem('key')
+    if (auth === null) {
+      location.href = location.origin + '/login.html'
+    } else {
+      authorization = auth
+      auth_key = key
+    }
+  }
+  // 获取时光蛋
+  const fetchTimeeggsSync = async (user_id) => {
+    const response = await fetch('/api' + '/v1/teg/timeeggs/view-user-timeeggs', {
+      mode: 'cors',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': authorization
+      },
+      body: searchParams({
+        user_id,
+        auth_key
+      })
+    })
+    const result = await response.json()
+
+    console.log(result)
+    if (result.success) {
+      timeeggs = result.data.timeeggs
+      return result.data
+    } else {
+      console.error(result)
+    }
+  }
+  // 获取蛋包
+  const fetchTimebagsSync = async (params) => {
+    const response = await fetch('/api' + '/v1/teg/timeeggs/fetch-timebags', {
+      mode: 'cors',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': authorization
+      },
+      body: searchParams({
+        access_token: params.access_token
+      })
+    })
+    const result = await response.json()
+
+    console.log(result)
+    if (result.success) {
+      return result.data
+    } else {
+      console.error(result)
+    }
+  }
+  const fetchOssImageAverageHueSync = async (img_url, tg_id) => {
+    const url = new URL(img_url)
+    const response = await fetch('/oss' + url.pathname + '?x-oss-process=image/average-hue')
+    const result = await response.json()
+    const root = document.documentElement
+
+    function hexToRgb(hex) {
+      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
+    function w3c(hex) {
+      var rgb = hexToRgb(hex)
+      var sum = rgb.r * 0.2126 + rgb.g * 0.7152 + rgb.b * 0.0722
+      var perceived_lightness = sum / 255
+      var background = `rgba(${rgb.r},${rgb.g},${rgb.b},.66)`
+      var color = `hsla(0, 0%, ${(perceived_lightness - 0.5) * (-100000)}%, .76)`
+      return {
+        color,
+        background
+      }
+    }
+
+    const w3cColor = w3c(`#${result.RGB.slice(2)}`)
+
+    const element = document.querySelector(`.egg${tg_id} .egg-info`)
+    element.style.backgroundColor = w3cColor.background
+    element.style.color = w3cColor.color
+
+    const element1 = document.querySelector(`.egg${tg_id} .bag-box`)
+    element1.style.backgroundColor = w3cColor.background
+    element1.style.color = w3cColor.color
+  }
+  const init = async () => {
+    await checkinSync()
+    let user_id = Number(getParamter('user'))
+    if (user_id === 0) {
+      location.href = location.origin + '/map.html'
+    }
+    const eggData = await fetchTimeeggsSync(user_id)
+    const promiseFetchTimebagsArray = eggData.timeeggs.map(async (egg, idx) => {
+      const bagInfo = await fetchTimebagsSync({
+        access_token: egg.access_token
+      })
+      // 获取第一个蛋包第一张照片的主色调
+      // if (bagInfo.timebags[0].images !== null) {
+      //   fetchOssImageAverageHueSync(bagInfo.timebags[0].images[0], egg.tg_id)
+      // }
+      const bagDom = bagInfo.timebags.map(bag => {
+        let imageDom = ''
+        let videoDom = ''
+        if (bag.images !== null) {
+          bag.images.map(src => {
+            imageDom += (
+              `
+                <img src="${src}?x-oss-process=image/resize,h_480/format,jpg/interlace,1" style="width: 100%;" />
+              `
+            )
+          })
+        }
+        if (bag.video) {
+          videoDom = `<video src="${bag.video}" controls style="width:100%;" ></video>`
+        }
+        return (
+          `
+          <div class="bag">
+            <div class="bag-info">
+              <span class="clock"></span>
+              <span class="date">${app.unixDateFormate(Number(bag.timebag_time))}</span>
+            </div>
+            <div class="bag-media">
+              ${imageDom}
+              ${videoDom}
+            </div>
+          </div>
+        `
+        )
+      })
+      container.innerHTML += (
+        // <p>city: ${egg.city}</p>
+        // <p>country: ${egg.country}</p>
+        // <p>lock: ${egg.isLocked}📍${egg.location}</p>
+        // <p>latlng: ${egg.latitude},${egg.longitude}</p>
+        // <span>${app.unixDateFormate(Number(egg.tg_time))}</span>
+        `
+        <div class="fade-box fade${egg.tg_id}"></div>
+        <div id="${egg.tg_id}" class="egg egg${egg.tg_id}">
+          <div class="padding"></div>
+          <div class="egg-info">
+            <span class="title">${egg.title}</span>
+            <span class="section">${egg.description}</span>
+            <span class="location">${egg.country} ${egg.city}</span>
+          </div>
+          <div class="bag-box">${bagDom}</div>
+        </div>
+      `
+      )
+      scrollTimeeggBoxInit(egg.tg_id)
+    })
+    setActiveTimeegg(timeeggs[0].tg_id)
+    await Promise.all(promiseFetchTimebagsArray)
+    scrollStart()
+    document.querySelectorAll('.egg .padding')[0].style.height = 0
+  }
+  init()
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function (event) {
+    console.log('DOM fully loaded and parsed')
+  })
+</script>
+
 </html>

@@ -1,0 +1,135 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,user-scalable=0, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>map</title>
+  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.49.0/mapbox-gl.js'></script>
+  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.css' rel='stylesheet' />
+  <style>
+    html,
+    body {
+      padding: 0;
+      margin: 0;
+    }
+
+    .map-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .marker {
+      width: 35px;
+      height: 35px;
+      border-radius: 35px;
+      background-size: cover;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map" class="map-container"></div>
+  <script>
+    let features = []
+  </script>
+  <script>
+    const searchParams = (params) => {
+      let result = Object.keys(params).map((key) => {
+        return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+      }).join('&')
+      return result;
+    }
+    let authorization = null
+    let auth_key = null
+    const controller = new AbortController()
+    const signal = controller.signal
+    const checkin = async () => {
+      const auth = await localStorage.getItem('auth')
+      const key = await localStorage.getItem('key')
+      if (auth === null) {
+        location.href = location.origin + '/login.html'
+      } else {
+        authorization = auth
+        auth_key = key
+      }
+    }
+    checkin()
+    mapboxgl.accessToken = 'pk.eyJ1IjoiY3JhenlrYXkiLCJhIjoiY2picnlwdDlhMG5ibTMzcjB1a2NkOGpsayJ9.kpSWi-Fytupo4yOtE5Vwrg';
+    const map = new mapboxgl.Map({
+      center: [121.45, 31.25],
+      zoom: 6,
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v9'
+    })
+
+    map.on('load', e => {
+      if ("geolocation" in navigator && location.protocol === 'https') {
+        /* geolocation is available */
+        navigator.geolocation.getCurrentPosition(function (position) {
+          const user_location = new mapboxgl.LngLat(position.coords.longitude, position.coords.latitude)
+          map.flyTo({ center: user_location, zoom: 12 })
+        })
+      } else {
+        /* geolocation IS NOT available */
+        const default_location = new mapboxgl.LngLat(121.47, 31.23)
+        map.flyTo({ center: default_location, zoom: 12 })
+      }
+    })
+    map.on('movestart', e => {
+      // controller.abort()
+    })
+    map.on('moveend', e => {
+      const bounds = map.getBounds()
+      fetchAreaTimeeggsSync(bounds)
+    })
+
+    const fetchAreaTimeeggsSync = async (bounds) => {
+
+      const response = await fetch('/api' + '/v1/teg/timeeggs/fetch-area-timeeggs', {
+        signal: signal,
+        mode: 'cors',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': authorization
+        },
+        body: searchParams({
+          auth_key,
+          upper_left_lon: bounds._sw.lng,
+          upper_left_lat: bounds._ne.lat,
+          buttom_right_lon: bounds._ne.lng,
+          buttom_right_lat: bounds._sw.lat
+        })
+      })
+      const result = await response.json()
+      if (result.success) {
+        setMarker(result.data.area_public_timeeggs)
+        return result.data
+      } else {
+        alert(result.status.msg)
+        console.error(result)
+      }
+    }
+
+    const setMarker = (eggs) => {
+      eggs.map(egg => {
+        let img_url = egg.owner.img_url ? `${egg.owner.img_url}?x-oss-process=image/resize,h_480/format,jpg/interlace,1` : './avatar.png'
+        var el = document.createElement('div')
+        el.className = 'marker'
+        el.id = egg.owner.user_id
+        el.style.backgroundImage = `url(${img_url})`
+        el.addEventListener('click', function () {
+          location.href = location.origin + '?user=' + egg.owner.user_id
+        })
+
+        // add marker to map
+        new mapboxgl.Marker(el)
+          .setLngLat([Number(egg.longitude), Number(egg.latitude)])
+          .addTo(map)
+      })
+    }
+  </script>
+</body>
+
+</html>
